@@ -1,5 +1,6 @@
+import os, sys, re
 import sublime, sublime_plugin
-import os, sys
+
 import threading
 import subprocess
 import functools
@@ -135,9 +136,10 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
             word_wrap = True, syntax = "Packages/Text/Plain text.tmLanguage",
             # Catches "path" and "shell"
             **kwargs):
-
+        self.sl = kwargs
         # clear the text_queue
         self.text_queue_lock.acquire()
+        self.truth = False
         try:
             self.text_queue.clear()
             self.text_queue_proc = None
@@ -168,36 +170,28 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
         self.output_view.settings().set("gutter", False)
         self.output_view.settings().set("scroll_past_end", False)
         self.output_view.assign_syntax(syntax)
-
-        # Call create_output_panel a second time after assigning the above
-        # settings, so that it'll be picked up as a result buffer
-        self.window.create_output_panel("exec")
-
+        merged_env = env.copy()
         self.encoding = encoding
         self.quiet = quiet
-
-        self.proc = None
-        if not self.quiet:
-            if shell_cmd:
-                print("Running " + shell_cmd)
-            elif cmd:
-                print("Running " + " ".join(cmd))
-            sublime.status_message("Building")
-
-        show_panel_on_build = sublime.load_settings("Preferences.sublime-settings").get("show_panel_on_build", True)
-        if show_panel_on_build:
-            self.window.run_command("show_panel", {"panel": "output.exec"})
-
-        merged_env = env.copy()
-        if self.window.active_view():
-            user_env = self.window.active_view().settings().get('build_env')
-            if user_env:
-                merged_env.update(user_env)
+        
+        # Call create_output_panel a second time after assigning the above
+        # settings, so that it'll be picked up as a result buffer
 
         # Change to the working dir, rather than spawning the process with it,
         # so that emitted working dir relative path names make sense
         if working_dir != "":
             os.chdir(working_dir)
+
+
+        self.window.show_input_panel("Input Args", "", functools.partial(self.fun, cmd, shell_cmd, merged_env), None, None)
+
+    def fun(self, cmd, shell_cmd, merged_env, ss):
+        self.window.create_output_panel("exec")
+        if shell_cmd:
+            shell_cmd += " " + str(ss)
+        else:
+            cmd += " " +str(ss)
+
 
         self.debug_text = ""
         if shell_cmd:
@@ -210,10 +204,32 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
         else:
             self.debug_text += "[path: " + str(os.environ["PATH"]) + "]"
 
+
+
+        self.proc = None
+        print("BILLZ")
+        # print(shell_cmd)
+        if not self.quiet:
+            if shell_cmd:
+                print("Running " + shell_cmd)
+            elif cmd:
+                print("Running " + " ".join(cmd))
+            sublime.status_message("Building")
+        show_panel_on_build = sublime.load_settings("Preferences.sublime-settings").get("show_panel_on_build", True)
+        if show_panel_on_build:
+            self.window.run_command("show_panel", {"panel": "output.exec"})
+
+
+        if self.window.active_view():
+            user_env = self.window.active_view().settings().get('build_env')
+            if user_env:
+                merged_env.update(user_env)
+
         try:
             # Forward kwargs to AsyncProcess
-            self.proc = AsyncProcess(cmd, shell_cmd, merged_env, self, **kwargs)
-
+            
+            self.proc = AsyncProcess(cmd, shell_cmd, merged_env, self, self.sl)
+            
             self.text_queue_lock.acquire()
             try:
                 self.text_queue_proc = self.proc
@@ -225,6 +241,7 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
             self.append_string(None, self.debug_text + "\n")
             if not self.quiet:
                 self.append_string(None, "[Finished]")
+    
 
     def is_enabled(self, kill = False):
         if kill:
