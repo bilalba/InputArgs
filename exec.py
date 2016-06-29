@@ -155,7 +155,10 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
 
         if not hasattr(self, 'output_view'):
             # Try not to call get_output_panel until the regexes are assigned
-            self.output_view = self.window.create_output_panel("exec")
+            if int(sublime.version()) >= 3000:
+                self.output_view = self.window.create_output_panel("exec")
+            else:
+                self.output_view = self.window.get_output_panel("exec")
 
         # Default the to the current files directory if no working directory was given
         if (working_dir == "" and self.window.active_view()
@@ -169,7 +172,8 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
         self.output_view.settings().set("line_numbers", False)
         self.output_view.settings().set("gutter", False)
         self.output_view.settings().set("scroll_past_end", False)
-        self.output_view.assign_syntax(syntax)
+        if int(sublime.version()) >= 3000:
+            self.output_view.assign_syntax(syntax)
         merged_env = env.copy()
         self.encoding = encoding
         self.quiet = quiet
@@ -186,11 +190,16 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
         self.window.show_input_panel("Input Args", "", functools.partial(self.fun, cmd, shell_cmd, merged_env), None, None)
 
     def fun(self, cmd, shell_cmd, merged_env, ss):
-        self.window.create_output_panel("exec")
+        if int(sublime.version()) >= 3000:
+            self.window.create_output_panel("exec")
+        else:
+            self.window.get_output_panel("exec")
+        # self.window.create_output_panel("exec")
+        print("THIis" + str(ss))
         if shell_cmd:
             shell_cmd += " " + str(ss)
         else:
-            cmd += " " +str(ss)
+            cmd.append(str(ss))
 
 
         self.debug_text = ""
@@ -208,7 +217,7 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
 
         self.proc = None
         print("BILLZ")
-        # print(shell_cmd)
+        print(cmd)
         if not self.quiet:
             if shell_cmd:
                 print("Running " + shell_cmd)
@@ -294,7 +303,18 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
         finally:
             self.text_queue_lock.release()
 
-        self.output_view.run_command('append', {'characters': str, 'force': True, 'scroll_to_end': True})
+        if int(sublime.version()) >= 3000:
+            self.output_view.run_command('append', {'characters': str, 'force': True, 'scroll_to_end': True})
+        else:
+            selection_was_at_end = (len(self.output_view.sel()) == 1 and self.output_view.sel()[0] == sublime.Region(self.output_view.size()))
+            self.output_view.set_read_only(False)
+            edit = self.output_view.begin_edit()
+            self.output_view.insert(edit, self.output_view.size(), str)
+            if selection_was_at_end:
+                self.output_view.show(self.output_view.size())
+            self.output_view.end_edit(edit)
+            self.output_view.set_read_only(True)
+
 
         if not is_empty:
             sublime.set_timeout(self.service_text_queue, 1)
@@ -304,6 +324,7 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
             elapsed = time.time() - proc.start_time
             exit_code = proc.exit_code()
             if exit_code == 0 or exit_code == None:
+                print("kutta scene")
                 self.append_string(proc,
                     ("[Finished in %.1fs]" % (elapsed)))
             else:
@@ -330,7 +351,7 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
         # Normalize newlines, Sublime Text always uses a single \n separator
         # in memory.
         str = str.replace('\r\n', '\n').replace('\r', '\n')
-
+        print(str)
         self.append_string(proc, str)
 
     def on_finished(self, proc):
