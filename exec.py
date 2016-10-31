@@ -6,6 +6,7 @@ import subprocess
 import functools
 import time
 import collections
+from .hist import history1 as history
 
 class ProcessListener(object):
     def on_data(self, proc, data):
@@ -188,6 +189,8 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
 
 
         self.window.show_input_panel("Input Args", "", functools.partial(self.fun, cmd, shell_cmd, merged_env), None, None)
+        v.settings().set('InputArgsInputPanel', True)
+
 
     def fun(self, cmd, shell_cmd, merged_env, ss):
         if int(sublime.version()) >= 3000:
@@ -195,7 +198,8 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
         else:
             self.window.get_output_panel("exec")
         # self.window.create_output_panel("exec")
-        print("THIis" + str(ss))
+        # print("THIis" + str(ss))
+        history.insert(ss)
         if shell_cmd:
             shell_cmd += " " + str(ss)
         else:
@@ -216,8 +220,8 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
 
 
         self.proc = None
-        print("BILLZ")
-        print(cmd)
+        # print("BILLZ")
+        # print(cmd)
         if not self.quiet:
             if shell_cmd:
                 print("Running " + shell_cmd)
@@ -324,7 +328,7 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
             elapsed = time.time() - proc.start_time
             exit_code = proc.exit_code()
             if exit_code == 0 or exit_code == None:
-                print("kutta scene")
+                # print("kutta scene")
                 self.append_string(proc,
                     ("[Finished in %.1fs]" % (elapsed)))
             else:

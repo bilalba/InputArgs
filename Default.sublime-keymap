@@ -1,0 +1,21 @@
+[
+	{
+		"keys": ["up"], "command": "input_args_history",
+		"args": {
+			"backwards": true
+		},
+		"context":
+		[
+			{ "key": "setting.InputArgsInputPanel", "operator": "equal", "operand": true }
+		]
+	},
+
+	{
+		"keys": ["down"], "command": "input_args_history",
+		"context":
+		[
+			{ "key": "setting.InputArgsInputPanel", "operator": "equal", "operand": true }
+		]
+	}
+
+]
