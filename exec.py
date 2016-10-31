@@ -188,7 +188,7 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
             os.chdir(working_dir)
 
 
-        self.window.show_input_panel("Input Args", "", functools.partial(self.fun, cmd, shell_cmd, merged_env), None, None)
+        v = self.window.show_input_panel("Input Args", "", functools.partial(self.fun, cmd, shell_cmd, merged_env), None, None)
         v.settings().set('InputArgsInputPanel', True)
 
 
