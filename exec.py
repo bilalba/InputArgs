@@ -137,7 +137,8 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
             word_wrap = True, syntax = "Packages/Text/Plain text.tmLanguage",
             # Catches "path" and "shell"
             **kwargs):
-        self.sl = kwargs
+
+        shell_cmd = ''.join(shell_cmd)
         # clear the text_queue
         self.text_queue_lock.acquire()
         self.truth = False
@@ -241,7 +242,7 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
         try:
             # Forward kwargs to AsyncProcess
             
-            self.proc = AsyncProcess(cmd, shell_cmd, merged_env, self, self.sl)
+            self.proc = AsyncProcess(cmd, shell_cmd, merged_env, self)
             
             self.text_queue_lock.acquire()
             try:
