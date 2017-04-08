@@ -6,7 +6,12 @@ import subprocess
 import functools
 import time
 import collections
-from .hist import history1 as history
+
+try:
+    # python 3 / Sublime Text 3
+    from .hist import history1 as history
+except ValueError:
+    from hist import history1 as history
 
 class ProcessListener(object):
     def on_data(self, proc, data):

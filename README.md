@@ -2,9 +2,14 @@
 A sublime text plugin to send custom input arguments when building using 'ctrl + b'. View a program output with custom arguments from within sublime text.
 
 
-##Installing
+## Installing
 
-###OSX
+### Using Package Control
+
+Install this sublime text 2/3 package via [Package Control](https://packagecontrol.io/); search for package: "InputArgs"
+
+
+### OSX
 
 ```
 $ cd ~/Library/Application\ Support/Sublime\ Text\ <2/3>/Packages/
@@ -12,7 +17,7 @@ $ git clone git://github.com/bilalba/InputArgs.git InputArgs
 
 ```
 
-###Linux (Ubuntu like distros)
+### Linux (Ubuntu like distros)
 
 ```
 $ cd ~/.config/sublime-text-<2/3>/Packages/
@@ -20,7 +25,7 @@ $ git clone git://github.com/bilalba/InputArgs.git InputArgs
 
 ```
 
-###Windows
+### Windows
 
 ```
 Copy the directory to: "C:\Users\<username>\AppData\Roaming\Sublime Text <2/3>\Packages"
