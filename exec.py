@@ -1,6 +1,6 @@
 import os, sys, re
 import sublime, sublime_plugin
-
+import html
 import threading
 import subprocess
 import functools
@@ -24,7 +24,7 @@ class ProcessListener(object):
 # ProcessListener (on a separate thread)
 class AsyncProcess(object):
     def __init__(self, cmd, shell_cmd, env, listener,
-            # "path" is an option in build systems
+            # "path" is an opt`ion in build systems
             path="",
             # "shell" is an options in build systems
             shell=False):
@@ -137,11 +137,23 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
 
     proc = None
 
+    errs_by_file = {}
+    phantom_sets_by_buffer = {}
+    show_errors_inline = True
+    
     def run(self, cmd = None, shell_cmd = None, file_regex = "", line_regex = "", working_dir = "",
             encoding = "utf-8", env = {}, quiet = False, kill = False,
+            update_phantoms_only=False, hide_phantoms_only=False,
             word_wrap = True, syntax = "Packages/Text/Plain text.tmLanguage",
             # Catches "path" and "shell"
             **kwargs):
+        if update_phantoms_only:
+            if self.show_errors_inline:
+                self.update_phantoms()
+            return
+        if hide_phantoms_only:
+            self.hide_phantoms()
+            return
         self.sl = kwargs
         # clear the text_queue
         self.text_queue_lock.acquire()
@@ -191,7 +203,6 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
         # so that emitted working dir relative path names make sense
         if working_dir != "":
             os.chdir(working_dir)
-
 
         v = self.window.show_input_panel("Input Args", "", functools.partial(self.fun, cmd, shell_cmd, merged_env), None, None)
         v.settings().set('InputArgsInputPanel', True)
@@ -307,23 +318,32 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
                 # the text_queue
                 return
 
-            str = self.text_queue.popleft()
+            characters = self.text_queue.popleft()
             is_empty = (len(self.text_queue) == 0)
         finally:
             self.text_queue_lock.release()
 
         if int(sublime.version()) >= 3000:
-            self.output_view.run_command('append', {'characters': str, 'force': True, 'scroll_to_end': True})
+            self.output_view.run_command('append', {'characters': characters, 'force': True, 'scroll_to_end': True})
+            if self.show_errors_inline and characters.find('\n') >= 0:
+                errs = self.output_view.find_all_results_with_text()
+                errs_by_file = {}
+                for file, line, column, text in errs:
+                    if file not in errs_by_file:
+                        errs_by_file[file] = []
+                    errs_by_file[file].append((line, column, text))
+                self.errs_by_file = errs_by_file
+
+                self.update_phantoms()
         else:
             selection_was_at_end = (len(self.output_view.sel()) == 1 and self.output_view.sel()[0] == sublime.Region(self.output_view.size()))
             self.output_view.set_read_only(False)
             edit = self.output_view.begin_edit()
-            self.output_view.insert(edit, self.output_view.size(), str)
+            self.output_view.insert(edit, self.output_view.size(), characters)
             if selection_was_at_end:
                 self.output_view.show(self.output_view.size())
             self.output_view.end_edit(edit)
             self.output_view.set_read_only(True)
-
 
         if not is_empty:
             sublime.set_timeout(self.service_text_queue, 1)
@@ -352,16 +372,86 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
 
     def on_data(self, proc, data):
         try:
-            str = data.decode(self.encoding)
+            characters = data.decode(self.encoding)
         except:
-            str = "[Decode error - output not " + self.encoding + "]\n"
+            characters = "[Decode error - output not " + self.encoding + "]\n"
             proc = None
 
         # Normalize newlines, Sublime Text always uses a single \n separator
         # in memory.
-        str = str.replace('\r\n', '\n').replace('\r', '\n')
-        print(str)
-        self.append_string(proc, str)
+        characters = characters.replace('\r\n', '\n').replace('\r', '\n')
+        print(characters)
+        self.append_string(proc, characters)
 
     def on_finished(self, proc):
         sublime.set_timeout(functools.partial(self.finish, proc), 0)
+
+    def update_phantoms(self):
+        stylesheet = '''
+            <style>
+                div.error {
+                    padding: 0.4rem 0 0.4rem 0.7rem;
+                    margin: 0.2rem 0;
+                    border-radius: 2px;
+                }
+
+                div.error span.message {
+                    padding-right: 0.7rem;
+                }
+
+                div.error a {
+                    text-decoration: inherit;
+                    padding: 0.35rem 0.7rem 0.45rem 0.8rem;
+                    position: relative;
+                    bottom: 0.05rem;
+                    border-radius: 0 2px 2px 0;
+                    font-weight: bold;
+                }
+                html.dark div.error a {
+                    background-color: #00000018;
+                }
+                html.light div.error a {
+                    background-color: #ffffff18;
+                }
+            </style>
+        '''
+
+        for file, errs in self.errs_by_file.items():
+            view = self.window.find_open_file(file)
+            if view:
+
+                buffer_id = view.buffer_id()
+                if buffer_id not in self.phantom_sets_by_buffer:
+                    phantom_set = sublime.PhantomSet(view, "exec")
+                    self.phantom_sets_by_buffer[buffer_id] = phantom_set
+                else:
+                    phantom_set = self.phantom_sets_by_buffer[buffer_id]
+
+                phantoms = []
+
+                for line, column, text in errs:
+                    pt = view.text_point(line - 1, column - 1)
+                    phantoms.append(sublime.Phantom(
+                        sublime.Region(pt, view.line(pt).b),
+                        ('<body id=inline-error>' + stylesheet +
+                            '<div class="error">' +
+                            '<span class="message">' + html.escape(text, quote=False) + '</span>' +
+                            '<a href=hide>' + chr(0x00D7) + '</a></div>' +
+                            '</body>'),
+                        sublime.LAYOUT_BELOW,
+                        on_navigate=self.on_phantom_navigate))
+
+                phantom_set.update(phantoms)
+
+    def hide_phantoms(self):
+        for file, errs in self.errs_by_file.items():
+            view = self.window.find_open_file(file)
+            if view:
+                view.erase_phantoms("exec")
+
+        self.errs_by_file = {}
+        self.phantom_sets_by_buffer = {}
+        self.show_errors_inline = False
+
+    def on_phantom_navigate(self, url):
+        self.hide_phantoms()
