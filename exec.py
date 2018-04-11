@@ -216,10 +216,11 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
         # self.window.create_output_panel("exec")
         # print("THIis" + str(ss))
         history.insert(ss)
-        if shell_cmd:
-            shell_cmd += " " + str(ss)
-        else:
-            cmd.append(str(ss))
+        for s in str(ss).split():
+            if shell_cmd:
+                shell_cmd += " " + s
+            else:
+                cmd.append(s)
 
 
         self.debug_text = ""
