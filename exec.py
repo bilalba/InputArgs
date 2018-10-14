@@ -257,7 +257,7 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
         try:
             # Forward kwargs to AsyncProcess
             
-            self.proc = AsyncProcess(cmd, shell_cmd, merged_env, self, self.sl)
+            self.proc = AsyncProcess(cmd, shell_cmd, merged_env, self, *self.sl)
             
             self.text_queue_lock.acquire()
             try:
