@@ -216,7 +216,7 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
         # self.window.create_output_panel("exec")
         # print("THIis" + str(ss))
         history.insert(ss)
-        for s in str(ss).split()
+        for s in str(ss).split():
             if shell_cmd:
                 shell_cmd += " " + s
             elif str(ss):
