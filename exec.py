@@ -27,7 +27,7 @@ class AsyncProcess(object):
             # "path" is an opt`ion in build systems
             path="",
             # "shell" is an options in build systems
-            shell=False):
+            shell=False, *args, **kwargs):
 
         if not shell_cmd and not cmd:
             raise ValueError("shell_cmd or cmd is required")
@@ -140,7 +140,7 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
     errs_by_file = {}
     phantom_sets_by_buffer = {}
     show_errors_inline = True
-    
+
     def run(self, cmd = None, shell_cmd = None, file_regex = "", line_regex = "", working_dir = "",
             encoding = "utf-8", env = {}, quiet = False, kill = False,
             update_phantoms_only=False, hide_phantoms_only=False,
@@ -195,7 +195,7 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
         merged_env = env.copy()
         self.encoding = encoding
         self.quiet = quiet
-        
+
         # Call create_output_panel a second time after assigning the above
         # settings, so that it'll be picked up as a result buffer
 
@@ -216,10 +216,11 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
         # self.window.create_output_panel("exec")
         # print("THIis" + str(ss))
         history.insert(ss)
-        if shell_cmd:
-            shell_cmd += " " + str(ss)
-        else:
-            cmd.append(str(ss))
+        for s in str(ss).split():
+            if shell_cmd:
+                shell_cmd += " " + s
+            elif str(ss):
+                cmd.append(s)
 
 
         self.debug_text = ""
@@ -256,9 +257,9 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
 
         try:
             # Forward kwargs to AsyncProcess
-            
-            self.proc = AsyncProcess(cmd, shell_cmd, merged_env, self, self.sl)
-            
+
+            self.proc = AsyncProcess(cmd, shell_cmd, merged_env, self, **self.sl)
+
             self.text_queue_lock.acquire()
             try:
                 self.text_queue_proc = self.proc
@@ -270,7 +271,7 @@ class ExecCommand(sublime_plugin.WindowCommand, ProcessListener):
             self.append_string(None, self.debug_text + "\n")
             if not self.quiet:
                 self.append_string(None, "[Finished]")
-    
+
 
     def is_enabled(self, kill = False):
         if kill:
